@@ -21,6 +21,18 @@ const REGIONS = [
   { name: '보령', lat: 36.33, lon: 126.61 },
 ];
 
+// 일정 구분 (DB 의 check 규칙과 같게 유지 · setup.sql)
+const KINDS = ['야외', '고소', '실내'];
+
+// 추가 전에 값 확인 → 문제 있으면 안내 글자, 없으면 ''
+function validateTask(t) {
+  if (!t.title || t.title.length > 100) return '일정 이름을 1~100자로 적어 주세요.';
+  if (!t.owner || t.owner.length > 100) return '담당을 1~100자로 적어 주세요.';
+  if (!REGIONS.some((r) => r.name === t.region)) return '지역은 세종 · 대전 · 태안 · 보령 중에서 골라 주세요.';
+  if (!KINDS.includes(t.kind)) return '구분은 야외 · 고소 · 실내 중에서 골라 주세요.';
+  return '';
+}
+
 // Open-Meteo 주소 (네 지역을 한 번에, 오늘 하루 최댓값)
 function buildWeatherUrl() {
   return 'https://api.open-meteo.com/v1/forecast'
@@ -70,4 +82,4 @@ function buildJudgeMarkdown(tasks, weatherByRegion, date, note) {
   return lines.join('\n');
 }
 
-if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, buildWeatherUrl, parseWeather, weatherText, buildJudgeMarkdown };
+if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, weatherText, buildJudgeMarkdown };
