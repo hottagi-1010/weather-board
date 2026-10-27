@@ -6,6 +6,7 @@ let baseTasks = [];
 let baseLoadError = false;  // 더블클릭(file://)으로 열면 JSON 을 못 읽음
 let tasks = [];
 let weatherByRegion = {};   // 03 단원에서 지역별 날씨를 넣음
+let testWind = false;       // ?test=wind 로 열었는지
 
 async function loadBaseTasks() {
   try {
@@ -23,10 +24,6 @@ async function loadBaseTasks() {
 function loadTasks() {
   const saved = JSON.parse(localStorage.getItem('wx_added') || '[]');
   tasks = baseTasks.concat(saved);
-}
-
-function weatherText(w) {
-  return w ? w.tempMax + '℃ · ' + w.windMax + 'm/s · ' + w.rainProb + '%' : '-';
 }
 
 function renderTasks() {
@@ -98,7 +95,7 @@ async function loadWeather() {
     return;
   }
 
-  const testWind = new URLSearchParams(location.search).get('test') === 'wind';
+  testWind = new URLSearchParams(location.search).get('test') === 'wind';
   if (testWind) {
     for (const name in weatherByRegion) weatherByRegion[name].windMax = 12;
   }
@@ -110,8 +107,24 @@ async function loadWeather() {
   renderTasks();
 }
 
+// 04 단원 : 지금 표를 md 파일로 내려받기 (md 만들기는 logic.js)
+function saveJudgeMarkdown() {
+  const date = todayText();
+  const note = testWind ? '> 테스트 모드(풍속 12 m/s) — 실제 날씨 판단이 아님' : '';
+  const md = buildJudgeMarkdown(tasks, weatherByRegion, date, note);
+  const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '현장일정_판단_' + date + '.md';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 document.getElementById('todayDate').textContent = todayText();
 document.getElementById('taskForm').addEventListener('submit', addTask);
+document.getElementById('saveMdBtn').addEventListener('click', saveJudgeMarkdown);
 loadBaseTasks().then(() => {
   loadTasks();
   renderTasks();

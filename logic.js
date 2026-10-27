@@ -48,4 +48,26 @@ function parseWeather(json) {
   return result;
 }
 
-if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, buildWeatherUrl, parseWeather };
+// 날씨 한 칸 글자 (화면 표와 md 표가 같이 씀)
+function weatherText(w) {
+  return w ? w.tempMax + '℃ · ' + w.windMax + 'm/s · ' + w.rainProb + '%' : '-';
+}
+
+// 오늘 판단을 마크다운으로 (note 가 있으면 제목 아래에 한 줄)
+function buildJudgeMarkdown(tasks, weatherByRegion, date, note) {
+  // 입력 글자 속 | 와 줄바꿈이 표를 깨지 않게
+  const cell = (v) => String(v).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  const lines = ['# 현장 일정 판단 (' + date + ')', ''];
+  if (note) lines.push(note, '');
+  lines.push('| 일정 | 지역 | 구분 | 담당 | 날씨 | 판단 |', '|---|---|---|---|---|---|');
+  for (const t of tasks) {
+    const w = weatherByRegion[t.region];
+    const row = [t.title, t.region, t.kind, t.owner, weatherText(w), judge(t.kind, w).text];
+    lines.push('| ' + row.map(cell).join(' | ') + ' |');
+  }
+  lines.push('', '판단 기준(교육용 가상): 실내는 영향 없음 · 고소 일정 풍속 ' + RULES.wind + 'm/s 이상 중지 검토 · 최고 기온 '
+    + RULES.heat + '℃ 이상 폭염 휴식 · 강수확률 ' + RULES.rain + '% 이상 우천 주의', '');
+  return lines.join('\n');
+}
+
+if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, buildWeatherUrl, parseWeather, weatherText, buildJudgeMarkdown };
