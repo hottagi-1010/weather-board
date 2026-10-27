@@ -1,21 +1,28 @@
 // app.js – 화면 동작 (목록 그리기, 일정 추가)
 
-// 01 단원 : 일정 목록을 코드 안에 둠 (가상 데이터) → 04 단원에서 data/tasks.json 으로 분리
-const SAMPLE_TASKS = [
-  { title: '다중이용시설 안전점검', region: '세종', kind: '야외', owner: '김안전' },
-  { title: '시민 안전체험 행사 운영', region: '보령', kind: '야외', owner: '이행사' },
-  { title: '옥상 태양광 설비 점검', region: '태안', kind: '고소', owner: '박설비' },
-  { title: '하천 수위계 확인', region: '대전', kind: '야외', owner: '최현장' },
-  { title: '청사 외벽 간판 보수', region: '세종', kind: '고소', owner: '정시설' },
-  { title: '비상연락 훈련', region: '대전', kind: '실내', owner: '한상황' },
-];
-
+// 04 단원 : 기본 일정은 data/tasks.json 에서 읽음 (가상 데이터)
+// 화면에서 추가한 일정만 브라우저 저장소(wx_added)에 따로 저장
+let baseTasks = [];
+let baseLoadError = false;  // 더블클릭(file://)으로 열면 JSON 을 못 읽음
 let tasks = [];
 let weatherByRegion = {};   // 03 단원에서 지역별 날씨를 넣음
 
+async function loadBaseTasks() {
+  try {
+    const res = await fetch('data/tasks.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    baseTasks = await res.json();
+    baseLoadError = false;
+  } catch (err) {
+    baseTasks = [];
+    baseLoadError = true;
+  }
+}
+
+// JSON 일정 먼저, 그 뒤에 화면에서 추가한 일정
 function loadTasks() {
   const saved = JSON.parse(localStorage.getItem('wx_added') || '[]');
-  tasks = SAMPLE_TASKS.concat(saved);
+  tasks = baseTasks.concat(saved);
 }
 
 function weatherText(w) {
@@ -25,6 +32,15 @@ function weatherText(w) {
 function renderTasks() {
   const body = document.getElementById('taskList');
   body.innerHTML = '';
+  if (baseLoadError) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 6;
+    td.className = 'stop';
+    td.textContent = '일정 파일(data/tasks.json)을 읽지 못했어요. 배포 주소로 열어 주세요.';
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
   for (const t of tasks) {
     const w = weatherByRegion[t.region];
     const r = judge(t.kind, w);
@@ -96,6 +112,8 @@ async function loadWeather() {
 
 document.getElementById('todayDate').textContent = todayText();
 document.getElementById('taskForm').addEventListener('submit', addTask);
-loadTasks();
-renderTasks();
+loadBaseTasks().then(() => {
+  loadTasks();
+  renderTasks();
+});
 loadWeather();
