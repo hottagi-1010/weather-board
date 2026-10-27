@@ -77,9 +77,63 @@ function buildJudgeMarkdown(tasks, weatherByRegion, date, note) {
     const row = [t.title, t.region, t.kind, t.owner, weatherText(w), judge(t.kind, w).text];
     lines.push('| ' + row.map(cell).join(' | ') + ' |');
   }
-  lines.push('', '판단 기준(교육용 가상): 실내는 영향 없음 · 고소 일정 풍속 ' + RULES.wind + 'm/s 이상 중지 검토 · 최고 기온 '
-    + RULES.heat + '℃ 이상 폭염 휴식 · 강수확률 ' + RULES.rain + '% 이상 우천 주의', '');
+  lines.push('', rulesText(), '');
   return lines.join('\n');
 }
 
-if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, weatherText, buildJudgeMarkdown };
+// 판단 기준 한 줄 (md 파일과 api/kma 가 같이 씀)
+function rulesText() {
+  return '판단 기준(교육용 가상): 실내는 영향 없음 · 고소 일정 풍속 ' + RULES.wind + 'm/s 이상 중지 검토 · 최고 기온 '
+    + RULES.heat + '℃ 이상 폭염 휴식 · 강수확률 ' + RULES.rain + '% 이상 우천 주의';
+}
+
+// 07 단원 : 기상청 단기예보 (api/kma.js 가 씀)
+// 위도 · 경도 → 기상청 격자 (nx, ny) · 기상청 안내서의 람베르트 변환식
+function kmaGrid(lat, lon) {
+  const DEG = Math.PI / 180;
+  const re = 6371.00877 / 5.0;
+  const slat1 = 30 * DEG, slat2 = 60 * DEG, olon = 126 * DEG, olat = 38 * DEG;
+  let sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+  sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
+  const sf = Math.pow(Math.tan(Math.PI * 0.25 + slat1 * 0.5), sn) * Math.cos(slat1) / sn;
+  const ro = re * sf / Math.pow(Math.tan(Math.PI * 0.25 + olat * 0.5), sn);
+  const ra = re * sf / Math.pow(Math.tan(Math.PI * 0.25 + lat * DEG * 0.5), sn);
+  let theta = lon * DEG - olon;
+  if (theta > Math.PI) theta -= 2 * Math.PI;
+  if (theta < -Math.PI) theta += 2 * Math.PI;
+  theta *= sn;
+  return { nx: Math.floor(ra * Math.sin(theta) + 43 + 0.5), ny: Math.floor(ro - ra * Math.cos(theta) + 136 + 0.5) };
+}
+
+// 발표 시각 고르기 : 오늘 02:00 발표 (02:10 전이면 전날 23:00 발표) → 오늘 하루치를 같은 기준으로
+function kmaBase(now) {
+  const kst = new Date(now.getTime() + 9 * 3600 * 1000);
+  const ymd = (d) => d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0') + String(d.getUTCDate()).padStart(2, '0');
+  const today = ymd(kst);
+  if (kst.getUTCHours() * 60 + kst.getUTCMinutes() >= 2 * 60 + 10) return { today, baseDate: today, baseTime: '0200' };
+  return { today, baseDate: ymd(new Date(kst.getTime() - 24 * 3600 * 1000)), baseTime: '2300' };
+}
+
+// 단기예보 주소 (공공데이터포털 Encoding · Decoding 키 둘 다 받음)
+function buildKmaUrl(key, grid, base) {
+  const serviceKey = key.includes('%') ? key : encodeURIComponent(key);
+  return 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst'
+    + '?serviceKey=' + serviceKey + '&pageNo=1&numOfRows=1000&dataType=JSON'
+    + '&base_date=' + base.baseDate + '&base_time=' + base.baseTime + '&nx=' + grid.nx + '&ny=' + grid.ny;
+}
+
+// 응답 → 오늘의 { tempMax, windMax, rainProb } (최고 기온 TMX · 시간별 기온 TMP · 풍속 WSD · 강수확률 POP)
+// 값이 하나라도 없으면 null
+function parseKma(json, today) {
+  const items = json && json.response && json.response.body && json.response.body.items && json.response.body.items.item;
+  if (!Array.isArray(items)) return null;
+  const max = (cats) => {
+    const vals = items.filter((it) => it.fcstDate === today && cats.includes(it.category))
+      .map((it) => Number(it.fcstValue)).filter((v) => Number.isFinite(v));
+    return vals.length ? Math.max(...vals) : null;
+  };
+  const w = { tempMax: max(['TMX', 'TMP']), windMax: max(['WSD']), rainProb: max(['POP']) };
+  return [w.tempMax, w.windMax, w.rainProb].every((v) => v !== null) ? w : null;
+}
+
+if (typeof module !== 'undefined') module.exports = { RULES, judge, REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, weatherText, buildJudgeMarkdown, rulesText, kmaGrid, kmaBase, buildKmaUrl, parseKma };

@@ -16,6 +16,7 @@
 - app.js     : 화면 동작 (목록 그리기, 일정 추가, Supabase 읽기 · 저장)
 - config.js  : Supabase 연결 정보 두 줄 (주소 · 공개용 키)만
 - setup.sql  : wx_tasks 표 · 값 규칙 · 행 보안 · 가상 일정 (SQL Editor 에서 직접 실행)
+- api/kma.js : Vercel 서버 함수 (/api/kma?region=지역 → 일정 · 기상청 날씨 · 판단 JSON). 판단 · 날씨 해석은 logic.js 함수를 씀
 - PRD.md · CLAUDE.md · README.md : 문서
 
 ## 작업 방식
@@ -32,3 +33,5 @@
 - 공개용 키로는 읽기 · 추가만 되도록 행 보안(RLS)을 유지한다. 수정 · 삭제 정책은 승인 없이 열지 않는다.
 - 표 구조나 정책을 바꿀 때는 setup.sql 을 고치고, 실행은 내가 SQL Editor 에서 한다.
 - wx_tasks 에도 가상 데이터만 넣는다.
+- 기상청 키는 Vercel 환경변수 SHORT_WEATHER_KEY 에만 둔다. 코드 · 채팅 · GitHub · 응답 JSON 에 넣지 않는다.
+- api/kma.js 는 읽기만 한다. DB 는 config.js 의 공개용 키로 읽고, 추가 · 수정 · 삭제 기능을 넣지 않는다.
