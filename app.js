@@ -59,6 +59,14 @@ function addTask(e) {
   renderTasks();
 }
 
+// 오늘 날짜를 YYYY-MM-DD 로 (내 PC 시간 기준)
+function todayText() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+document.getElementById('todayDate').textContent = todayText();
 document.getElementById('taskForm').addEventListener('submit', addTask);
 loadTasks();
 renderTasks();
