@@ -66,7 +66,36 @@ function todayText() {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
+// 03 단원 : Open-Meteo 에서 지역별 오늘 날씨를 받아 판단에 사용
+// 주소 끝에 ?test=wind 를 붙이면 모든 지역 풍속을 12 m/s 로 바꿔 규칙을 시험
+async function loadWeather() {
+  const box = document.getElementById('weatherBox');
+  box.textContent = '날씨 불러오는 중…';
+  try {
+    const res = await fetch(buildWeatherUrl());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    weatherByRegion = parseWeather(await res.json());
+    if (Object.keys(weatherByRegion).length === 0) throw new Error('빈 응답');
+  } catch (err) {
+    weatherByRegion = {};
+    box.textContent = '날씨를 불러오지 못했어요 (' + err.message + ') · 일정은 그대로 볼 수 있어요';
+    return;
+  }
+
+  const testWind = new URLSearchParams(location.search).get('test') === 'wind';
+  if (testWind) {
+    for (const name in weatherByRegion) weatherByRegion[name].windMax = 12;
+  }
+
+  const parts = REGIONS.filter((r) => weatherByRegion[r.name])
+    .map((r) => r.name + ' ' + weatherText(weatherByRegion[r.name]));
+  box.textContent = (testWind ? '[테스트 모드: 풍속 12 m/s] ' : '')
+    + '오늘 날씨 (최고 기온 · 최대 풍속 · 강수확률) — ' + parts.join(' / ');
+  renderTasks();
+}
+
 document.getElementById('todayDate').textContent = todayText();
 document.getElementById('taskForm').addEventListener('submit', addTask);
 loadTasks();
 renderTasks();
+loadWeather();
